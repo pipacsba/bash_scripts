@@ -1,0 +1,38 @@
+#!/bin/bash
+
+#konyok center data
+centerfile=konyokcenter.txt 
+#Define which JPG files to be searched in the directory
+filefilter="W*.JPG"
+
+for jpgfile in $filefilter; do
+	echo $jpgfile
+	#assign width and height values to internal variables
+	read -r afile awidth aheight <<< $( convert $jpgfile -format "%f %w %h" info:)
+	while read -r pict x y; do
+		if [[ $jpgfile == *$pict* ]]; then
+			konyok_x=$x
+			konyok_y=$y
+		fi
+	done < $centerfile
+	echo konyok_x=$konyok_x
+	echo konyok_y=$konyok_y
+	let konyok_mx=$awidth-$konyok_x
+	let konyok_my=$aheight-$konyok_y
+	if [ $konyok_x -gt $konyok_mx ]; then
+		let chop_x=$konyok_x-$konyok_mx
+		k_grav_x="East"
+	else
+		let chop_x=$konyok_mx-$konyok_x
+		k_grav_x="West"
+	fi
+	if [ $konyok_y -gt $konyok_my ]; then
+		let chop_y=$konyok_y-$konyok_my
+		k_grav_y="North"
+	else
+		let chop_y=$konyok_my-$konyok_y
+		k_grav_y="South"
+	fi
+	atext=${jpgfile:1:${#filename}-4}
+	convert $jpgfile -background black -gravity $k_grav_x -splice "$chop_x"x0 -gravity $k_grav_y -chop 0x"$chop_y" A$atext.JPG
+done

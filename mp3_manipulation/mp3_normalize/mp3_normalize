@@ -1,0 +1,84 @@
+#!/bin/bash
+#this script normalizes all mp3 file in a given directory, to max volume = 0 dB
+
+# set the directory which shall be normalized
+filefilter="./input/*.mp3"
+
+# remove prious run result
+rm mp3_normalize_log.txt
+rm original*.*
+rm result*.*
+
+# internal counter
+song_num=1
+# for each file
+for mp3file in $filefilter; do
+
+	# get the filename from the path
+	b=$(basename "$mp3file")
+	
+	# print filename
+	echo "($song_num) File:  $b"
+	
+	# detect maximum value
+	ffmpeg -i "$mp3file" -af volumedetect -f null -y nul &> "original_$song_num.txt"
+	
+	# get maximum value line
+	grep "max_volume" "original_$song_num.txt" > original1.tmp
+	sed -i 's|: -|=|' original1.tmp
+	
+	# if sed was successfull
+	if [ $? = 0 ]; then
+	
+		# copy the line to a temp file
+	 	grep "max_volume" original1.tmp > original2.tmp
+		
+		# cut out the value, result can conatin : or =
+		sed -i 's/^.*volume=//' original2.tmp
+		sed -i 's/^.*volume://' original2.tmp
+		
+		#get original bitrate
+		bit=`ffmpeg -i "${mp3file}" 2>&1 | grep Audio | awk -F", " '{print $5}' | cut -d' ' -f1`
+		
+		# put the maximum value to a variable
+	 	yourscriptvar=$(cat "./original2.tmp")
+		yourscriptvar=${yourscriptvar//[$'\t\r\n']}
+		yourscriptvar=${yourscriptvar%$" dB"}
+		
+		#if volume increase is necessary (max volume is below "-1 dB"
+		if (( ${yourscriptvar%%.*} > 1 ))
+		then
+			# set the amplification value (max volume - 1 dB)
+			yourscriptvar2=$(awk -v a=$yourscriptvar "BEGIN {print a-1; exit}")
+			echo "    The measured volume is $yourscriptvar dB"
+			# make the conversion
+			ffmpeg -loglevel panic -i "$mp3file" -ab ${bit}k -af "volume=$yourscriptvar2"dB result.mp3
+			
+			# detect the new maximum value
+			ffmpeg -i result.mp3 -af volumedetect -f null -y nul &> "result_$song_num.txt"
+			
+			# get the new maximum value 
+			grep "max_volume" "result_$song_num.txt" > original1.tmp	
+			sed -i 's|: -|=|' original1.tmp
+			grep "max_volume" original1.tmp > original2.tmp
+			sed -i 's/^.*volume=//' original2.tmp
+			sed -i 's/^.*volume://' original2.tmp
+			yourresult=$(cat "./original2.tmp")
+			yourresult=${yourresult//[$'\t\r\n']}
+		
+			# write out the result
+			echo "    New volume: -$yourresult "
+			
+			# write the log to file
+			output_string="($song_num)  ("$b") $yourscriptvar $yourresult"
+			printf "$output_string \n" >> mp3_normalize_log.txt
+			
+			# move the result
+			mv result.mp3 "./output/$b"
+		else
+			echo "    No conversion is performed as volume is $yourscriptvar"
+		fi
+	fi
+	#increae internal counter
+	let song_num=$song_num+1
+done

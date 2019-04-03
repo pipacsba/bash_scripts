@@ -1,0 +1,11 @@
+ffmpeg -y -i "KicsiGesztenyeKlub__Fogmoso.mp3" -t 152 -c copy "KicsiGesztenyeKlub__Fogmoso_ok.mp3"
+
+#other useful commands
+#-t [sec] - az új file hossza
+#-to [sec] - idáig az eredetibol
+#-ss [sec] - innentol kezdi az új filet (elotte levágja)
+
+#KicsiGesztenyeKlub_Hahoember - 3s eleje
+#KicsiGesztenyeKlub_NyarVan - 3s eleje
+#KicsiGesztenyeKlub_TikTak - 3s eleje
+#KicsiGesztenyeKlub__Fogmoso - 15s vége

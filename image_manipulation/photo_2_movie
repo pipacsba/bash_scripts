@@ -1,0 +1,27 @@
+#convert photos to movie file
+
+filefilter="A*.JPG"
+photo_time=2
+
+
+for jpgfile in $filefilter; do
+	let filecount=$filecount+1
+done
+
+let filecount=$filecount+2
+
+photo_time=2
+let movie_length=$photo_time*$filecount
+
+# crop the audio file to the desired length
+ffmpeg -y -t $movie_length -i wow.mp3 -acodec copy pocak_audio_x.mp3
+
+fade_length=8
+let fade_out=$movie_length-$fade_length
+
+# fade-out end of the mp3
+ffmpeg -y -i pocak_audio_x.mp3  -af "afade=t=out:st=$fade_out:d=$fade_length" -id3v2_version 3 pocak_audio.mp3
+
+# finally create the movie file
+# ffmpeg -y -framerate 1/$photo_time -start_number 0 -i ./%06d.JPG -i ./pocak_audio.mp3 -c:v libx264 -r 25 -pix_fmt yuv420p -c:a aac -strict experimental -shortest output.mp4
+ffmpeg -y -framerate 1/$photo_time -start_number 0 -thread_queue_size 512 -i ./%06d.JPG -i ./pocak_audio.mp3 -r 25 -pix_fmt yuv420p -c:a mp3 -s 1920x1080 -c:v mpeg2video -qscale:v 1 -strict experimental pocak.mp4

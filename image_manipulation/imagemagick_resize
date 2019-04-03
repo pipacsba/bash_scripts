@@ -1,0 +1,83 @@
+#!/bin/bash
+#Script locates all .JPG file in the current directory, and performes the following "converts":
+# - creates an annotation to the picture with the file name (w/o directory and suffix)
+# - reduces the image size to a conform 4k UHD (3840 pixels x 2160 lines)
+# - fills the size of the picture to 4k UHD
+# the files than will be written in a new filename %06.JPG
+#
+
+#Define which JPG files to be searched in the directory
+filefilter="A*.JPG"
+#Define maximum output resolution
+UHD_height=2160
+UHD_width=3840
+#Define color of the annotation text added to the pictures
+annotationcolor="HotPink3"
+#Define font of the annotation text added to the pictures
+annotationfont="URW-Chancery-L-Medium-Italic"
+# annotationfont="Segoe-Print"
+# define the lenth in the movie file for each photo in seconds
+photo_time=2
+
+#Initial calculation needed to define the maximum (common sense) resolution of the output pictures
+uhd_ratio="$(($UHD_width*1000/$UHD_height))"
+
+#initialize some internal variables
+filecount=0
+minratio=100000
+maxratio=1
+
+#1st round: go throug each file and read the width and height values to calculate picture ratios
+for jpgfile in $filefilter; do
+	#assign width and height values to internal variables
+	read -r afile awidth aheight <<< $( convert $jpgfile -format "%f %w %h" info:)
+	#calculate picture ratio
+	aratio="$(($awidth*1000/$aheight))"
+	#save this ratio if this is at least local minimum or maximum
+	if [ $aratio -gt $maxratio ]; then
+		maxratio=$aratio
+	fi
+	if [ $aratio -lt $minratio ]; then
+		minratio=$aratio
+	fi
+done
+
+#new variable to define output picture's resolution
+thewidth=$UHD_width
+theheight=$UHD_height
+
+#change target resolution if it is makes sense (usefull area will any way not used of the cropped picture area by no picture in the folder)
+if [ $uhd_ratio -gt $maxratio ]; then
+	thewidth=$(($UHD_width*$maxratio/$uhd_ratio))
+fi
+if [ $uhd_ratio -lt $minratio ]; then
+	theheight=$(($UHD_height*$minratio/$uhd_ratio))
+fi
+echo "Picture ratio that fits all available images ($thewidth x $theheight) "
+
+#2nd round: convert pictures
+for jpgfile in $filefilter; do
+	#cut ./filename.ext to filename
+	filename=$(basename $jpgfile)
+	echo "Now Processing File: ${filename}"
+	#cut useful name from filename
+	atext=${filename:1:${#filename}-5}
+	#if needed change the filename to a correct annotation (manual work actually)
+	if [ $atext == "BDay" ]; then
+		atext="Vége"
+	elif [ $atext == "Beg" ]; then
+		atext="És az új kezdet"
+	else
+		atext="$atext. hét"
+	fi
+	echo "  annotation: $atext"
+	#define output filename
+	outfile=$(printf "%06d" $filecount)
+	echo "  Output file: $outfile.JPG"
+	let filecount=$filecount+1
+	#make the actual conversion it takes several steps:
+	#-resize "$thewidth"x"$theheight" 	- the actual resize into the predefined maximum resolution
+	#-gravity south -pointsize 400 -font $annotationfont -fill black -annotate +10-10 "$atext" -fill $annotationcolor -annotate 0 "$atext"     - draw the annotation in the defined color, with shadow
+	#-gravity center -background transparent -extent "$thewidth"x"$theheight"        - expand the picture area so all the output pictures have the same resolution
+	convert $filename -resize "$thewidth"x"$theheight" -gravity center -background transparent -extent "$thewidth"x"$theheight" -gravity south -pointsize 400 -font $annotationfont -fill black -annotate +10-10 "$atext" -fill $annotationcolor -annotate 0 "$atext" -strip -sampling-factor '4:2:0' -type TrueColor jpeg:$outfile.JPG
+done
