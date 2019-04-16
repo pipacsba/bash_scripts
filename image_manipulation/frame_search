@@ -1,0 +1,35 @@
+#!/bin/bash
+# searches similar frames as input picutre, and cuts the movie accordingly
+
+movie="BB_S01.mkv"
+input_picutre="vlcsnap.png"
+logfile="blackframes.txt"
+logfile2="blackframes_uniq.txt"
+
+# ffmpeg -i $movie -r 1 -loop 1 -i $input_picutre -an -filter_complex "blend=difference:shortest=1,blackframe=85:32" -f null - 2>&1 | grep -oP --line-buffered "last_keyframe:[0-9]+" &> $logfile
+echo "file read completed"
+
+# uniq $logfile > $logfile2
+# echo "uniq items identified"
+
+startframe=0
+sequence=1
+while read -r aframe; do
+	keyframe=$(echo $aframe | grep -oP "[0-9]+")
+	# echo "keyframe: $keyframe"
+	let framediff=$keyframe-$startframe
+	# echo "framediff identified as $framediff, startframe is $startframe"
+	if [ $framediff -gt 6500 ]; then
+		let startsec=$startframe/25
+		let endsec=$keyframe/25
+		echo "cut started from $startsec to $endsec"
+		ffmpeg -y -v quiet -i $movie -ss $startsec -to $endsec -acodec mp3 -vcodec copy "BB_S01_E$sequence.mkv"
+		let startframe=$keyframe
+		let sequence=$sequence+1
+	else
+		echo "framediff is short, do nothing"
+	fi
+done < $logfile2
+echo "cut remaining starting at $endsec"
+ffmpeg -y -v quiet -i $movie -ss $endsec -acodec mp3 -vcodec copy "BB_S01_E$sequence.mkv"
+echo "All done"
