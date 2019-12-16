@@ -1,0 +1,49 @@
+#!/bin/bash
+
+orig_dir=$1
+echo $orig_dir
+target_dir=$2
+echo $target_dir
+
+# for each element in directory
+for file in  $orig_dir/*; do 
+	# if it is a file (not directory)
+    if [ -f "$file" ]; then 
+		filename=$(basename $file)
+		#get date of file from filesystem
+        adate=$(find $file -printf '%CY_%Cm')
+		
+		#overwrite with default value
+		adate="NoDateFound"
+		
+		#try to get a better date from file name
+		btype="$(cut -d'_' -f1 <<<$filename)"
+		bdate="$(cut -d'_' -f2 <<<$filename)"
+		# if cut is successfull
+		if [ ! btype == bdate ]; then
+			#echo "cut successfull: $btype"
+			# if the file first part is in the list
+			if [ $btype == "VIDEO" ] || [ $btype == "VID" ] || [ $btype == "IMG" ] || [ $btype == "PHOTO" ] || [ $btype == "PANO" ]; then
+				#echo "correct filename found"
+				if [ ${#bdate} == 8 ]; then
+					byear=${bdate:0:4}
+					bmonth=${bdate:4:2}
+					adate=$(echo "${byear}_${bmonth}")
+					#echo "new date:$adate ${byear}_${bmonth}, $bdate"
+				fi
+			fi
+		fi
+		#echo "$filename"
+		#echo $adate
+		if [ ! -d "$target_dir/$adate" ]; then
+			# Control will enter here if $DIRECTORY doesn't exist.
+			mkdir $target_dir/$adate
+		fi
+		#echo "$target_dir/$adate/$file"
+		if [ ! -L $target_dir/$adate/$filename ]; then
+			echo "File $target_dir/$adate/$filename symlink created."
+			echo "$orig_dir/$file"
+			ln $orig_dir/$filename -t $target_dir/$adate
+		fi
+    fi 
+done
