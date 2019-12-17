@@ -1,8 +1,24 @@
 #!/bin/bash
 #this script normalizes all mp3 file in a given directory, to max volume = 0 dB
 
-# set the directory which shall be normalized
-filefilter="./input/*.mp3"
+SAVEIFS=$IFS
+
+orig_dir=$1
+#echo $orig_dir
+target_dir=$2
+#echo $target_dir
+
+# get all the files recursively in the directory which shall be normalized
+IFS=$'\n'
+filefilter=$(find $orig_dir \( -name '*.mp3' \))
+declare -a filelist
+for mp3file in $filefilter; do
+	filelist+=("$mp3file")
+	echo $mp3file
+done
+echo ${filelist[@]}
+IFS=$SAVEIFS
+#echo $filefilter
 
 # remove prious run result
 rm mp3_normalize_log.txt
@@ -11,74 +27,95 @@ rm result*.*
 
 # internal counter
 song_num=1
+
 # for each file
-for mp3file in $filefilter; do
+for mp3file in "${filelist[@]}"; do
+
+	echo ""
 
 	# get the filename from the path
-	b=$(basename "$mp3file")
+	mp3filename=$(basename "$mp3file")
+	
+	mp3path=${mp3file#$orig_dir}
+	mp3path=${mp3path%$mp3filename}
+	echo "file:$mp3file"
+	echo "mp3path:$mp3path"
+	echo "orig_dir:$orig_dir"
+	
+	IFS='/' 
+	read -r -a dirarray <<< "$mp3path"
+	IFS=$SAVEIFS
+	echo "The path array is:${dirarray[*]}"
+	bdir=$target_dir
+	for adir in "${dirarray[@]}"; do
+		if [ ! $adir == "" ]; then
+			bdir=$bdir/$adir
+			if [ ! -d "$bdir" ]; then
+				mkdir $bdir
+				echo "bdir=$bdir"
+			fi
+		fi
+	done
 	
 	# print filename
-	echo "($song_num) File:  $b"
+	echo "($song_num) File:  $mp3filename"
 	
 	# detect maximum value
-	ffmpeg -i "$mp3file" -af volumedetect -f null -y nul &> "original_$song_num.txt"
+	#ffmpeg -i "$mp3file" -af volumedetect -f null -y nul &> "original_$song_num.txt"
+	ffmpeg -y -i "$mp3file" -ab 576k -pass 1 -filter:a loudnorm=print_format=json -f mp3 nul &> "original_$song_num.txt"
 	
-	# get maximum value line
-	grep "max_volume" "original_$song_num.txt" > original1.tmp
+	# get values
+	grep -E "input_i|input_lra|input_tp|input_thresh" "original_$song_num.txt" &> original1.tmp
+	grep -E "input_i|input_lra|input_tp|input_thresh" "original_$song_num.txt"
 	sed -i 's|: -|=|' original1.tmp
 	
-	# if sed was successfull
-	if [ $? = 0 ]; then
+	# copy the line to a temp file
+	grep "input_i" original1.tmp > original2.tmp
+	# cut out the value, result can contain : or =
+	sed -i 's/^.*= //' original2.tmp
+	sed -i 's/^.*: //' original2.tmp
+	input_i=$(cat "./original2.tmp")
+	input_i=${input_i//[$'\t\r\n,"']}
+	#echo $input_i
 	
-		# copy the line to a temp file
-	 	grep "max_volume" original1.tmp > original2.tmp
-		
-		# cut out the value, result can conatin : or =
-		sed -i 's/^.*volume=//' original2.tmp
-		sed -i 's/^.*volume://' original2.tmp
-		
-		#get original bitrate
-		bit=`ffmpeg -i "${mp3file}" 2>&1 | grep Audio | awk -F", " '{print $5}' | cut -d' ' -f1`
-		
-		# put the maximum value to a variable
-	 	yourscriptvar=$(cat "./original2.tmp")
-		yourscriptvar=${yourscriptvar//[$'\t\r\n']}
-		yourscriptvar=${yourscriptvar%$" dB"}
-		
-		#if volume increase is necessary (max volume is below "-1 dB"
-		if (( ${yourscriptvar%%.*} > 1 ))
-		then
-			# set the amplification value (max volume - 1 dB)
-			yourscriptvar2=$(awk -v a=$yourscriptvar "BEGIN {print a-1; exit}")
-			echo "    The measured volume is $yourscriptvar dB"
-			# make the conversion
-			ffmpeg -loglevel panic -i "$mp3file" -ab ${bit}k -af "volume=$yourscriptvar2"dB result.mp3
-			
-			# detect the new maximum value
-			ffmpeg -i result.mp3 -af volumedetect -f null -y nul &> "result_$song_num.txt"
-			
-			# get the new maximum value 
-			grep "max_volume" "result_$song_num.txt" > original1.tmp	
-			sed -i 's|: -|=|' original1.tmp
-			grep "max_volume" original1.tmp > original2.tmp
-			sed -i 's/^.*volume=//' original2.tmp
-			sed -i 's/^.*volume://' original2.tmp
-			yourresult=$(cat "./original2.tmp")
-			yourresult=${yourresult//[$'\t\r\n']}
-		
-			# write out the result
-			echo "    New volume: -$yourresult "
-			
-			# write the log to file
-			output_string="($song_num)  ("$b") $yourscriptvar $yourresult"
-			printf "$output_string \n" >> mp3_normalize_log.txt
-			
-			# move the result
-			mv result.mp3 "./output/$b"
-		else
-			echo "    No conversion is performed as volume is $yourscriptvar"
-		fi
-	fi
+	# copy the line to a temp file
+	grep "input_lra" original1.tmp > original2.tmp
+	# cut out the value, result can contain : or =
+	sed -i 's/^.*= //' original2.tmp
+	sed -i 's/^.*: //' original2.tmp
+	input_lra=$(cat "./original2.tmp")
+	input_lra=${input_lra//[$'\t\r\n,"']}
+	#echo $input_lra
+	
+	# copy the line to a temp file
+	grep "input_tp" original1.tmp > original2.tmp
+	# cut out the value, result can contain : or =
+	sed -i 's/^.*= //' original2.tmp
+	sed -i 's/^.*: //' original2.tmp
+	input_tp=$(cat "./original2.tmp")
+	input_tp=${input_tp//[$'\t\r\n,"']}
+	#echo $input_tp
+	
+	# copy the line to a temp file
+	grep "input_thresh" original1.tmp > original2.tmp
+	# cut out the value, result can contain : or =
+	sed -i 's/^.*= //' original2.tmp
+	sed -i 's/^.*: //' original2.tmp
+	input_thresh=$(cat "./original2.tmp")
+	input_thresh=${input_thresh//[$'\t\r\n,"']}
+	#echo $input_thresh
+	
+	#get original bitrate
+	bit=`ffmpeg -i "${mp3file}" 2>&1 | grep Audio | awk -F", " '{print $5}' | cut -d' ' -f1`
+	#echo $bit
+
+	# make the conversion
+	#ffmpeg -loglevel panic -i "$mp3file" -ab ${bit}k -af "volume=$yourscriptvar2"dB result.mp3
+	ffmpeg -y -i "$mp3file" -ab ${bit}k -pass 2 -filter:a loudnorm=linear=true:measured_I=$input_i:measured_LRA=$input_lra:measured_tp=$input_tp:measured_thresh=$input_thresh:print_format=json -f mp3 "$mp3filename" &> "result_$song_num.txt"
+	grep -E "output_i|output_lra|output_tp|output_thresh" "result_$song_num.txt"
+
+	mv "$mp3filename" "$target_dir$mp3path"
+
 	#increae internal counter
 	let song_num=$song_num+1
 done
