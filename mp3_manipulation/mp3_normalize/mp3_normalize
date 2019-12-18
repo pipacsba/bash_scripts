@@ -44,25 +44,30 @@ for mp3file in "${filelist[@]}"; do
 	
 	IFS='/' 
 	read -r -a dirarray <<< "$mp3path"
-	IFS=$SAVEIFS
 	echo "The path array is:${dirarray[*]}"
 	bdir=$target_dir
 	for adir in "${dirarray[@]}"; do
 		if [ ! $adir == "" ]; then
 			bdir=$bdir/$adir
 			if [ ! -d "$bdir" ]; then
-				mkdir $bdir
-				echo "bdir=$bdir"
+				echo "Creating directory: $bdir"
+				mkdir "$bdir"
 			fi
 		fi
 	done
+	IFS=$SAVEIFS
+	
+	cp "$mp3file" ./tmp.mp3
+	
+	#mp3file='"'$mp3file'"'
+	#echo $mp3file
 	
 	# print filename
 	echo "($song_num) File:  $mp3filename"
 	
 	# detect maximum value
 	#ffmpeg -i "$mp3file" -af volumedetect -f null -y nul &> "original_$song_num.txt"
-	ffmpeg -y -i "$mp3file" -ab 576k -pass 1 -filter:a loudnorm=print_format=json -f mp3 nul &> "original_$song_num.txt"
+	ffmpeg -y -i "./tmp.mp3" -ab 576k -pass 1 -filter:a loudnorm=print_format=json -f mp3 nul &> "original_$song_num.txt"
 	
 	# get values
 	grep -E "input_i|input_lra|input_tp|input_thresh" "original_$song_num.txt" &> original1.tmp
@@ -106,12 +111,11 @@ for mp3file in "${filelist[@]}"; do
 	#echo $input_thresh
 	
 	#get original bitrate
-	bit=`ffmpeg -i "${mp3file}" 2>&1 | grep Audio | awk -F", " '{print $5}' | cut -d' ' -f1`
-	#echo $bit
+	bit=`ffmpeg -i "./tmp.mp3" 2>&1 | grep Audio | awk -F", " '{print $5}' | cut -d' ' -f1`
+	echo "bitrate: $bit"
 
 	# make the conversion
-	#ffmpeg -loglevel panic -i "$mp3file" -ab ${bit}k -af "volume=$yourscriptvar2"dB result.mp3
-	ffmpeg -y -i "$mp3file" -ab ${bit}k -pass 2 -filter:a loudnorm=linear=true:measured_I=$input_i:measured_LRA=$input_lra:measured_tp=$input_tp:measured_thresh=$input_thresh:print_format=json -f mp3 "$mp3filename" &> "result_$song_num.txt"
+	ffmpeg -y -i "./tmp.mp3" -ab ${bit}k -pass 2 -filter:a loudnorm=linear=false:measured_I=$input_i:measured_LRA=$input_lra:measured_tp=$input_tp:measured_thresh=$input_thresh:print_format=json -f mp3 "./$mp3filename" &> "result_$song_num.txt"
 	grep -E "output_i|output_lra|output_tp|output_thresh" "result_$song_num.txt"
 
 	mv "$mp3filename" "$target_dir$mp3path"
