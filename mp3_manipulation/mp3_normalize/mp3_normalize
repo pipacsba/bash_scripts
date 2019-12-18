@@ -16,9 +16,9 @@ filefilter=$(find $orig_dir \( -name '*.mp3' \))
 declare -a filelist
 for mp3file in $filefilter; do
 	filelist+=("$mp3file")
-	echo $mp3file
+	#echo $mp3file
 done
-echo ${filelist[@]}
+#echo ${filelist[@]}
 IFS=$SAVEIFS
 #echo $filefilter
 
@@ -33,6 +33,7 @@ song_num=1
 # for each file
 #  note: the quote character is must in order to handle the spaces, otherwise the list becomes longer...
 for mp3file in "${filelist[@]}"; do
+	result=""
 	# get the filename from the path
 	mp3filename=$(basename "$mp3file")
 	#get the relative path of the mp3 file
@@ -54,19 +55,19 @@ for mp3file in "${filelist[@]}"; do
 	IFS=$SAVEIFS
 	
 	#if the target file does not exists
-	if [ ! -f "$target_dir$mp3path/$mp4filename" ]; then
-		# write out some info
+	if [ ! -f "$target_dir$mp3path$mp3filename" ]; then
+
+		# print filename
 		echo ""
-		echo "file:$mp3file"
-		echo "mp3path:$mp3path"
-		echo "orig_dir:$orig_dir"
-		echo "The path array is:${dirarray[*]}"
+		echo "($song_num) File:  $mp3filename"
+		
+		# write out some info
+		#echo "file:$mp3file"
+		echo "	\"relative path\": $mp3path"
+		#echo "The path array is:${dirarray[*]}"
 		
 		#create a copy of the original file (as somehow cygwin does not like ffmpeg with cygrdive link files...)
 		cp "$mp3file" ./tmp.mp3
-		
-		# print filename
-		echo "($song_num) File:  $mp3filename"
 		
 		# loudnorm filter 1st pass
 		ffmpeg -y -i "./tmp.mp3" -ab 576k -pass 1 -filter:a loudnorm=print_format=json -f mp3 nul &> "original_$song_num.txt"
@@ -118,17 +119,34 @@ for mp3file in "${filelist[@]}"; do
 		
 		#get original bitrate
 		bit=`ffmpeg -i "./tmp.mp3" 2>&1 | grep Audio | awk -F", " '{print $5}' | cut -d' ' -f1`
-		echo "bitrate: $bit"
+		echo "	\"bitrate\": $bit"
 
 		# loudnorm filter 2nd pass
 		ffmpeg -y -i "./tmp.mp3" -ab ${bit}k -pass 2 -filter:a loudnorm=linear=true:measured_I=$input_i:measured_LRA=$input_lra:measured_tp=$input_tp:measured_thresh=$input_thresh:print_format=json -f mp3 "./$mp3filename" &> "result_$song_num.txt"
 		#write out the resulting info of the filter
 		grep -E "output_i|output_lra|output_tp|output_thresh" "result_$song_num.txt"
+		result_offset=$(grep "target_offset" "result_$song_num.txt")
 		
-		#move the file to the planned location (target_dir + path)
+		if [ ${#result_offset} > 5 ]; then
+			# file loudness performed, create text to report
+			result="($song_num) $mp3filename  $result_offset"
+		else
+			# file loudness not performed, create text to report
+			result="($song_num) $mp3filename  FAILED"
+		fi
+		
+		# move the file to the planned location (target_dir + path)
 		mv "$mp3filename" "$target_dir$mp3path"
+	else
+		# file already exists, create text to report
+		result="($song_num) $mp3filename  aready exists at target directory, nothing to do"
+		echo $result
 	fi
+	
+	echo $result >> mp3_normalize_log.txt
 	
 	#increae internal counter
 	let song_num=$song_num+1
 done
+echo "" >> mp3_normalize_log.txt
+rm tmp.mp3
