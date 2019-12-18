@@ -1,5 +1,6 @@
 #!/bin/bash
-#this script normalizes all mp3 file in a given directory, to max volume = 0 dB
+#this script normalizes all mp3 file in a given directory using ffmpeg loudnorm
+# usage: mp3_normalize /input/dir /output/dir
 
 SAVEIFS=$IFS
 
