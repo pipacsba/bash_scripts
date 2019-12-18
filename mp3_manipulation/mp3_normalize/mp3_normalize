@@ -11,6 +11,7 @@ target_dir=$2
 # get all the files recursively in the directory which shall be normalized
 IFS=$'\n'
 filefilter=$(find $orig_dir \( -name '*.mp3' \))
+# create a list while the delimiters are modified to handle paths with space character
 declare -a filelist
 for mp3file in $filefilter; do
 	filelist+=("$mp3file")
@@ -29,97 +30,104 @@ rm result*.*
 song_num=1
 
 # for each file
+#  note: the quote character is must in order to handle the spaces, otherwise the list becomes longer...
 for mp3file in "${filelist[@]}"; do
-
-	echo ""
-
 	# get the filename from the path
 	mp3filename=$(basename "$mp3file")
-	
+	#get the relative path of the mp3 file
 	mp3path=${mp3file#$orig_dir}
 	mp3path=${mp3path%$mp3filename}
-	echo "file:$mp3file"
-	echo "mp3path:$mp3path"
-	echo "orig_dir:$orig_dir"
 	
 	IFS='/' 
 	read -r -a dirarray <<< "$mp3path"
-	echo "The path array is:${dirarray[*]}"
+	
 	bdir=$target_dir
 	for adir in "${dirarray[@]}"; do
 		if [ ! $adir == "" ]; then
 			bdir=$bdir/$adir
 			if [ ! -d "$bdir" ]; then
-				echo "Creating directory: $bdir"
 				mkdir "$bdir"
 			fi
 		fi
 	done
 	IFS=$SAVEIFS
 	
-	cp "$mp3file" ./tmp.mp3
-	
-	#mp3file='"'$mp3file'"'
-	#echo $mp3file
-	
-	# print filename
-	echo "($song_num) File:  $mp3filename"
-	
-	# detect maximum value
-	#ffmpeg -i "$mp3file" -af volumedetect -f null -y nul &> "original_$song_num.txt"
-	ffmpeg -y -i "./tmp.mp3" -ab 576k -pass 1 -filter:a loudnorm=print_format=json -f mp3 nul &> "original_$song_num.txt"
-	
-	# get values
-	grep -E "input_i|input_lra|input_tp|input_thresh" "original_$song_num.txt" &> original1.tmp
-	grep -E "input_i|input_lra|input_tp|input_thresh" "original_$song_num.txt"
-	sed -i 's|: -|=|' original1.tmp
-	
-	# copy the line to a temp file
-	grep "input_i" original1.tmp > original2.tmp
-	# cut out the value, result can contain : or =
-	sed -i 's/^.*= //' original2.tmp
-	sed -i 's/^.*: //' original2.tmp
-	input_i=$(cat "./original2.tmp")
-	input_i=${input_i//[$'\t\r\n,"']}
-	#echo $input_i
-	
-	# copy the line to a temp file
-	grep "input_lra" original1.tmp > original2.tmp
-	# cut out the value, result can contain : or =
-	sed -i 's/^.*= //' original2.tmp
-	sed -i 's/^.*: //' original2.tmp
-	input_lra=$(cat "./original2.tmp")
-	input_lra=${input_lra//[$'\t\r\n,"']}
-	#echo $input_lra
-	
-	# copy the line to a temp file
-	grep "input_tp" original1.tmp > original2.tmp
-	# cut out the value, result can contain : or =
-	sed -i 's/^.*= //' original2.tmp
-	sed -i 's/^.*: //' original2.tmp
-	input_tp=$(cat "./original2.tmp")
-	input_tp=${input_tp//[$'\t\r\n,"']}
-	#echo $input_tp
-	
-	# copy the line to a temp file
-	grep "input_thresh" original1.tmp > original2.tmp
-	# cut out the value, result can contain : or =
-	sed -i 's/^.*= //' original2.tmp
-	sed -i 's/^.*: //' original2.tmp
-	input_thresh=$(cat "./original2.tmp")
-	input_thresh=${input_thresh//[$'\t\r\n,"']}
-	#echo $input_thresh
-	
-	#get original bitrate
-	bit=`ffmpeg -i "./tmp.mp3" 2>&1 | grep Audio | awk -F", " '{print $5}' | cut -d' ' -f1`
-	echo "bitrate: $bit"
+	#if the target file does not exists
+	if [ ! -f "$target_dir$mp3path/$mp4filename" ]; then
+		# write out some info
+		echo ""
+		echo "file:$mp3file"
+		echo "mp3path:$mp3path"
+		echo "orig_dir:$orig_dir"
+		echo "The path array is:${dirarray[*]}"
+		
+		#create a copy of the original file (as somehow cygwin does not like ffmpeg with cygrdive link files...)
+		cp "$mp3file" ./tmp.mp3
+		
+		# print filename
+		echo "($song_num) File:  $mp3filename"
+		
+		# loudnorm filter 1st pass
+		ffmpeg -y -i "./tmp.mp3" -ab 576k -pass 1 -filter:a loudnorm=print_format=json -f mp3 nul &> "original_$song_num.txt"
+		
+		# get the necessary values
+		grep -E "input_i|input_lra|input_tp|input_thresh" "original_$song_num.txt" &> original1.tmp
+		# also write out the input filter parameters
+		grep -E "input_i|input_lra|input_tp|input_thresh" "original_$song_num.txt"
+		
+		# copy the line to a temp file
+		grep "input_i" original1.tmp > original2.tmp
+		# cut out the value, result can contain : or =
+		sed -i 's/^.*= //' original2.tmp
+		sed -i 's/^.*: //' original2.tmp
+		input_i=$(cat "./original2.tmp")
+		#remove the not necessary characters
+		input_i=${input_i//[$'\t\r\n,"']}
+		#echo $input_i
+		
+		# copy the line to a temp file
+		grep "input_lra" original1.tmp > original2.tmp
+		# cut out the value, result can contain : or =
+		sed -i 's/^.*= //' original2.tmp
+		sed -i 's/^.*: //' original2.tmp
+		input_lra=$(cat "./original2.tmp")
+		#remove the not necessary characters
+		input_lra=${input_lra//[$'\t\r\n,"']}
+		#echo $input_lra
+		
+		# copy the line to a temp file
+		grep "input_tp" original1.tmp > original2.tmp
+		# cut out the value, result can contain : or =
+		sed -i 's/^.*= //' original2.tmp
+		sed -i 's/^.*: //' original2.tmp
+		input_tp=$(cat "./original2.tmp")
+		#remove the not necessary characters
+		input_tp=${input_tp//[$'\t\r\n,"']}
+		#echo $input_tp
+		
+		# copy the line to a temp file
+		grep "input_thresh" original1.tmp > original2.tmp
+		# cut out the value, result can contain : or =
+		sed -i 's/^.*= //' original2.tmp
+		sed -i 's/^.*: //' original2.tmp
+		input_thresh=$(cat "./original2.tmp")
+		#remove the not necessary characters
+		input_thresh=${input_thresh//[$'\t\r\n,"']}
+		#echo $input_thresh
+		
+		#get original bitrate
+		bit=`ffmpeg -i "./tmp.mp3" 2>&1 | grep Audio | awk -F", " '{print $5}' | cut -d' ' -f1`
+		echo "bitrate: $bit"
 
-	# make the conversion
-	ffmpeg -y -i "./tmp.mp3" -ab ${bit}k -pass 2 -filter:a loudnorm=linear=false:measured_I=$input_i:measured_LRA=$input_lra:measured_tp=$input_tp:measured_thresh=$input_thresh:print_format=json -f mp3 "./$mp3filename" &> "result_$song_num.txt"
-	grep -E "output_i|output_lra|output_tp|output_thresh" "result_$song_num.txt"
-
-	mv "$mp3filename" "$target_dir$mp3path"
-
+		# loudnorm filter 2nd pass
+		ffmpeg -y -i "./tmp.mp3" -ab ${bit}k -pass 2 -filter:a loudnorm=linear=false:measured_I=$input_i:measured_LRA=$input_lra:measured_tp=$input_tp:measured_thresh=$input_thresh:print_format=json -f mp3 "./$mp3filename" &> "result_$song_num.txt"
+		#write out the resulting info of the filter
+		grep -E "output_i|output_lra|output_tp|output_thresh" "result_$song_num.txt"
+		
+		#move the file to the planned location (target_dir + path)
+		mv "$mp3filename" "$target_dir$mp3path"
+	fi
+	
 	#increae internal counter
 	let song_num=$song_num+1
 done
