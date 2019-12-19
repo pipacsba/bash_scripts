@@ -28,25 +28,32 @@ rm original*.*
 rm result*.*
 
 # internal counter
-song_num=1
+song_num=10001
 
+song_total=0
+for mp3file in "${filelist[@]}"; do
+	let song_total=$song_total+1
+done
 # for each file
 #  note: the quote character is must in order to handle the spaces, otherwise the list becomes longer...
 for mp3file in "${filelist[@]}"; do
 	result=""
+	#mp3file=$(printf '%b' "$mp3file")
+	
 	# get the filename from the path
-	mp3filename=$(basename "$mp3file")
+	mp3filename=$(basename -- "$mp3file")
+	
 	#get the relative path of the mp3 file
 	mp3path=${mp3file#$orig_dir}
-	mp3path=${mp3path%$mp3filename}
+	mp3path=${mp3path%"$mp3filename"}
 	
 	IFS='/' 
 	read -r -a dirarray <<< "$mp3path"
 	
-	bdir=$target_dir
+	bdir="$target_dir"
 	for adir in "${dirarray[@]}"; do
-		if [ ! $adir == "" ]; then
-			bdir=$bdir/$adir
+		if [ ! "$adir" == "" ]; then
+			bdir="$bdir"/"$adir"
 			if [ ! -d "$bdir" ]; then
 				mkdir "$bdir"
 			fi
@@ -56,10 +63,9 @@ for mp3file in "${filelist[@]}"; do
 	
 	#if the target file does not exists
 	if [ ! -f "$target_dir$mp3path$mp3filename" ]; then
-
 		# print filename
 		echo ""
-		echo "($song_num) File:  $mp3filename"
+		echo "(${song_num:1:4}/$song_total) File:  $mp3filename"
 		
 		# write out some info
 		#echo "file:$mp3file"
@@ -131,10 +137,10 @@ for mp3file in "${filelist[@]}"; do
 		
 		if (( ${#result_offset} > 5 )); then
 			# file loudness performed, create text to report
-			result="($song_num) $mp3filename  $result_offset"
+			result="(${song_num:1:4}) DONE	$mp3filename  $result_offset"
 		else
 			# file loudness not performed, create text to report
-			result="($song_num) $mp3filename  FAILED"
+			result="(${song_num:1:4}) FAILED	$mp3filename"
 			echo "	FAILED"
 		fi
 		
@@ -142,14 +148,14 @@ for mp3file in "${filelist[@]}"; do
 		mv "$mp3filename" "$target_dir$mp3path"
 	else
 		# file already exists, create text to report
-		result="($song_num) $mp3filename  aready exists at target directory, nothing to do"
-		echo $result
+		result="(${song_num:1:4}) NOP	$mp3filename  aready exists at target directory, nothing to do"
+		echo "(${song_num:1:4}/$song_total) NOP	$mp3filename  aready exists at target directory, nothing to do"
 	fi
 	
 	echo $result >> mp3_normalize_log.txt
 	
 	#increae internal counter
-	let song_num=$song_num+1
+	let song_num=$song_num+0001
 done
 echo "" >> mp3_normalize_log.txt
 rm tmp.mp3
