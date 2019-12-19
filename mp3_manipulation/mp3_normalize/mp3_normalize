@@ -11,7 +11,7 @@ target_dir=$2
 
 # get all the files recursively in the directory which shall be normalized
 IFS=$'\n'
-filefilter=$(find $orig_dir \( -name '*.mp3' \))
+filefilter=$(find $orig_dir \( -name '*.mp3' -o -name '*.m4a' -o -name '*.MP3' -o -name '*.Mp3' -o -name '*.wma' \))
 # create a list while the delimiters are modified to handle paths with space character
 declare -a filelist
 for mp3file in $filefilter; do
