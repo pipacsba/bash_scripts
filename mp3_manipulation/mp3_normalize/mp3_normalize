@@ -119,6 +119,7 @@ for mp3file in "${filelist[@]}"; do
 		
 		#get original bitrate
 		bit=`ffmpeg -i "./tmp.mp3" 2>&1 | grep Audio | awk -F", " '{print $5}' | cut -d' ' -f1`
+		bit=$(echo $bit | tr -dc '0-9')
 		echo "	\"bitrate\": $bit"
 
 		# loudnorm filter 2nd pass
@@ -126,13 +127,15 @@ for mp3file in "${filelist[@]}"; do
 		#write out the resulting info of the filter
 		grep -E "output_i|output_lra|output_tp|output_thresh" "result_$song_num.txt"
 		result_offset=$(grep "target_offset" "result_$song_num.txt")
+		#echo $result_offset ${#result_offset}
 		
-		if [ ${#result_offset} > 5 ]; then
+		if (( ${#result_offset} > 5 )); then
 			# file loudness performed, create text to report
 			result="($song_num) $mp3filename  $result_offset"
 		else
 			# file loudness not performed, create text to report
 			result="($song_num) $mp3filename  FAILED"
+			echo "	FAILED"
 		fi
 		
 		# move the file to the planned location (target_dir + path)
