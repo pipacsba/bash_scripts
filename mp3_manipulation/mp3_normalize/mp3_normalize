@@ -11,7 +11,7 @@ target_dir=$2
 
 # get all the files recursively in the directory which shall be normalized
 IFS=$'\n'
-filefilter=$(find $orig_dir \( -name '*.mp3' -o -name '*.m4a' -o -name '*.MP3' -o -name '*.Mp3' -o -name '*.wma' \))
+filefilter=$(find $orig_dir \( -name '*.mp3' -o -name '*.m4a' -o -name '*.MP3' -o -name '*.Mp3' -o -name '*.wma' -o -name '*.flac' \))
 # create a list while the delimiters are modified to handle paths with space character
 declare -a filelist
 for mp3file in $filefilter; do
@@ -126,6 +126,10 @@ for mp3file in "${filelist[@]}"; do
 		#get original bitrate
 		bit=`ffmpeg -i "./tmp.mp3" 2>&1 | grep Audio | awk -F", " '{print $5}' | cut -d' ' -f1`
 		bit=$(echo $bit | tr -dc '0-9')
+		if (( ${#bit} == 0 )); then
+			bit=`ffmpeg -i "./tmp.mp3" 2>&1 | grep bitrate | awk -F", " '{print $3}' | cut -d' ' -f2`
+			bit=$(echo $bit | tr -dc '0-9')
+		fi
 		echo "	\"bitrate\": $bit"
 
 		# loudnorm filter 2nd pass
