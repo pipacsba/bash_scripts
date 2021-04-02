@@ -11,7 +11,7 @@ for file in  $orig_dir/*; do
     if [ -f "$file" ]; then 
 		filename=$(basename $file)
 		#get date of file from filesystem
-        adate=$(find $file -printf '%CY_%Cm')
+                #adate=$(find $file -printf '%CY_%Cm')
 		
 		#overwrite with default value
 		adate="NoDateFound"
@@ -41,9 +41,9 @@ for file in  $orig_dir/*; do
 		fi
 		#echo "$target_dir/$adate/$file"
 		if [ ! -L $target_dir/$adate/$filename ]; then
-			echo "File $target_dir/$adate/$filename symlink created."
-			echo "$orig_dir/$file"
-			ln $orig_dir/$filename -t $target_dir/$adate
+			#echo "File $target_dir/$adate/$filename symlink created."
+			#echo "$orig_dir/$file"
+			ln $orig_dir/$filename $target_dir/$adate
 		fi
     fi 
 done
