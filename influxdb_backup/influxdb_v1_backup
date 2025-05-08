@@ -1,0 +1,17 @@
+#!/bin/bash
+
+dates=$(date +%d)
+
+echo $((10#${dates}%2))
+
+if [ $((10#${dates}%2)) -eq 0 ];
+
+then
+
+echo 'date is even'
+
+else
+
+echo 'date is odd'
+
+fi
