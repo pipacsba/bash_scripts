@@ -5,13 +5,11 @@ dates=$(date +%d)
 echo $((10#${dates}%2))
 
 if [ $((10#${dates}%2)) -eq 0 ];
-
-then
-
-echo 'date is even'
-
-else
-
-echo 'date is odd'
-
+  then
+    backup_dir=/var/lib/influxdb_backup/A/
+  else
+    backup_dir=/var/lib/influxdb_backup/B/
 fi
+
+docker exec -it influxdb sh -c "rm $backup_dir*"
+docker exec -it influxdb influxd backup -portable $backup_dir
