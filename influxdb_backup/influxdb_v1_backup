@@ -11,5 +11,5 @@ if [ $((10#${dates}%2)) -eq 0 ];
     backup_dir=/var/lib/influxdb_backup/B/
 fi
 
-docker exec -it influxdb sh -c "rm $backup_dir*"
+docker exec -it influxdb sh -c 'rm $backup_dir*'
 docker exec -it influxdb influxd backup -portable $backup_dir
